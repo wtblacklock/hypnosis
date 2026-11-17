@@ -3,7 +3,7 @@ export type AmbientType = "pad" | "ocean" | "rain" | "padOcean" | "none";
 
 export interface Settings {
   style: VisualStyle;
-  intensity: number; // 0.2 - 1
+  intensity: number; // 0.2 - 1.5
   narrationVolume: number; // 0 - 1
   ambientVolume: number; // 0 - 1
   ambient: AmbientType;
@@ -33,7 +33,7 @@ export const AMBIENTS: { id: AmbientType; name: string }[] = [
 
 export const DEFAULTS: Settings = {
   style: "fractal",
-  intensity: 0.65,
+  intensity: 1.0,
   narrationVolume: 0.9,
   ambientVolume: 0.5,
   ambient: "pad",
@@ -47,7 +47,7 @@ export const DEFAULTS: Settings = {
   pace: 0.82,
 };
 
-const KEY = "reverie.settings.v1";
+const KEY = "reverie.settings.v2";
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULTS };

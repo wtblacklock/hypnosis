@@ -60,7 +60,7 @@ export default function Controls({ s, set, showStyle = true }: { s: Settings; se
               </button>
             ))}
           </div>
-          <Slider label="Visual intensity" value={s.intensity} min={0.2} max={1} onChange={(v) => set({ intensity: v })} />
+          <Slider label="Visual intensity" value={s.intensity} min={0.2} max={1.5} hint={`${Math.round(s.intensity * 100)}%`} onChange={(v) => set({ intensity: v })} />
         </Section>
       )}
 

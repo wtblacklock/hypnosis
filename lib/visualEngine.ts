@@ -47,7 +47,7 @@ export class VisualEngine {
     this.ctx2 = fxCanvas.getContext("2d")!;
     this.webglOk = !!this.gl;
     if (this.gl) this.setupGL();
-    for (let i = 0; i < 70; i++) this.particles.push(this.newParticle(true));
+    for (let i = 0; i < 130; i++) this.particles.push(this.newParticle(true));
     glCanvas.addEventListener("webglcontextlost", this.onCtxLost);
     document.addEventListener("visibilitychange", this.onVis);
   }
@@ -143,7 +143,7 @@ export class VisualEngine {
       for (let k = 0; k < 3; k++) this.palette[i][k] += (this.paletteTarget[i][k] - this.palette[i][k]) * Math.min(1, dt * 0.8);
 
     const idle = st.playing ? 1 : 0.55;
-    const speed = (0.5 + 0.7 * s.intensity) * (1 - 0.4 * this.depth) * (reduced ? 0.25 : 1) * idle;
+    const speed = (0.5 + 0.55 * s.intensity) * (1 - 0.4 * this.depth) * (reduced ? 0.25 : 1) * idle;
     this.t += dt * speed;
     this.breathPhase += dt / Math.max(4, st.breathPeriod);
     const breath = 0.5 - 0.5 * Math.cos(this.breathPhase * Math.PI * 2);
@@ -239,7 +239,7 @@ export class VisualEngine {
         p.x += p.vx * dt * sp; p.y += p.vy * dt * sp; p.ph += dt * 0.25;
         if (p.y < -0.05) Object.assign(p, this.newParticle(false));
         const tw = 0.55 + 0.45 * Math.sin(p.ph);
-        const a = 0.22 * tw * fade * (0.4 + 0.6 * s.intensity);
+        const a = 0.3 * tw * fade * (0.4 + 0.6 * Math.min(1.2, s.intensity));
         const x = p.x * w, y = p.y * h, r = p.r * (m / 500) * 3;
         const sp2 = this.sprite(Math.floor(p.hue * 3));
         c.globalAlpha = a / 0.22 * 0.35;
@@ -250,11 +250,11 @@ export class VisualEngine {
 
     if (s.breathRings) {
       const amp = motion;
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 5; i++) {
         const base = m * (0.11 + i * 0.075);
         const r = base * (0.9 + 0.22 * breath * amp * (1 + i * 0.25));
         c.lineWidth = 1.2;
-        c.strokeStyle = col(i, (0.20 - i * 0.045) * fade * (0.5 + 0.5 * s.intensity));
+        c.strokeStyle = col(i, (0.26 - i * 0.04) * fade * (0.5 + 0.5 * Math.min(1.2, s.intensity)));
         c.beginPath(); c.arc(cx, cy, r, 0, 6.2832); c.stroke();
       }
     }
