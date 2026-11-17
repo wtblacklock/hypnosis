@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { AMBIENTS, STYLES, Settings } from "@/lib/settings";
 import { getVoices, speechSupported } from "@/lib/narrator";
+import SpotifyPanel from "./SpotifyPanel";
 
 export function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, hint, rainbow }: {
   rainbow?: boolean;
@@ -96,6 +97,7 @@ export default function Controls({ s, set, showStyle = true }: { s: Settings; se
             </button>
           ))}
         </div>
+        {s.ambient === "spotify" && <SpotifyPanel s={s} set={set} />}
         {speechSupported() && voices.length > 0 && (
           <label className="block">
             <div className="mb-1 text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">Voice</div>

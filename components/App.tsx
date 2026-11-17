@@ -4,6 +4,7 @@ import HypnoCanvas from "./HypnoCanvas";
 import SessionSelect from "./SessionSelect";
 import SetupPanel from "./SetupPanel";
 import Player from "./Player";
+import * as spotify from "@/lib/spotify";
 import { loadManifest } from "@/lib/narrator";
 import { AmbientEngine } from "@/lib/audioEngine";
 import { EngineView, newVisualState, SessionEngine } from "@/lib/sessionEngine";
@@ -30,6 +31,10 @@ export default function App() {
   useEffect(() => {
     loadManifest();
     const s = loadSettings();
+    // Returning from Spotify's login page: finish the login and switch to Spotify sound
+    if (spotify.spotifyConfigured() && /[?&]code=/.test(window.location.search)) {
+      spotify.handleCallback().then((ok) => { if (ok) update({ ambient: "spotify" }); });
+    }
     settingsRef.current = s;
     setSettings(s);
     setReady(true);
@@ -40,7 +45,10 @@ export default function App() {
     settingsRef.current = next;
     setSettings(next);
     saveSettings(next);
-    if ("ambientVolume" in p) audio.current?.setVolume(next.ambientVolume);
+    if ("ambientVolume" in p) {
+      audio.current?.setVolume(next.ambientVolume);
+      if (next.ambient === "spotify") spotify.setVolume(next.ambientVolume * 100);
+    }
     if ("ambient" in p) audio.current?.setType(next.ambient);
   }, []);
 
@@ -49,6 +57,29 @@ export default function App() {
     audio.current?.setType(settings.ambient);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
+
+  // Spotify follows the session: start with it, pause/resume with it, fade out at the end
+  const prevStatus = useRef<EngineView["status"]>("idle");
+  const [spotifyMsg, setSpotifyMsg] = useState("");
+  useEffect(() => {
+    const prev = prevStatus.current;
+    prevStatus.current = view.status;
+    const st = settingsRef.current;
+    if (st.ambient !== "spotify" || !st.spotifyUri) return;
+    const vol = st.ambientVolume * 100;
+    if (view.status === "playing" && prev === "idle") {
+      setSpotifyMsg("");
+      spotify.startContext(st.spotifyUri, vol).then((r) => {
+        if (r === "no-device") setSpotifyMsg("Open the Spotify app on this device, then tap resume.");
+        else if (r === "premium") setSpotifyMsg("Spotify Premium is required for playback control.");
+        else if (r === "auth") setSpotifyMsg("Spotify login expired. Reconnect in settings.");
+        else if (r === "error") setSpotifyMsg("Couldn't start Spotify.");
+      });
+    } else if (view.status === "paused" && prev === "playing") spotify.pausePlayback();
+    else if (view.status === "playing" && prev === "paused") spotify.resumePlayback();
+    else if (view.status === "done") spotify.fadeOutAndPause(vol, sid === "sleep" ? 14 : 6);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.status]);
 
   const session = sessionById(sid);
   const palette = useMemo(() => session.palette, [session]);
@@ -80,6 +111,7 @@ export default function App() {
 
   const end = () => {
     engine.current?.stop();
+    if (settingsRef.current.ambient === "spotify") spotify.fadeOutAndPause(settingsRef.current.ambientVolume * 100, 2);
     visual.targetDepth = 0.1;
     visual.fade = 1;
     setScreen("select");
@@ -97,7 +129,7 @@ export default function App() {
       {screen === "select" && <SessionSelect onPick={pick} />}
       {screen === "setup" && <SetupPanel session={session} s={settings} set={update} onBegin={begin} onBack={() => setScreen("select")} />}
       {screen === "session" && (
-        <Player view={view} s={settings} set={update} onToggle={toggle} onJump={(d) => engine.current?.jump(d)} onEnd={end} />
+        <Player spotifyMsg={spotifyMsg} view={view} s={settings} set={update} onToggle={toggle} onJump={(d) => engine.current?.jump(d)} onEnd={end} />
       )}
       {screen === "done" && (
         <div className="fadein absolute inset-0 grid place-items-center bg-black/25 px-6 text-center">

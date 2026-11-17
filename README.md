@@ -24,6 +24,17 @@ KOKORO_VOICE="bm_george+bm_lewis" ...        # Kokoro voice blends also work
 ```
 Options: `KOKORO_URL`, `KOKORO_VOICE`, `KOKORO_SPEED`, `KOKORO_MODEL`, `KOKORO_FORMAT`, `FORCE=1`. Re-runs only render new or edited lines. When `public/audio/manifest.json` exists the player uses those clips (the pace slider adjusts playback speed); lines without a clip fall back to browser speech. The files are git-ignored.
 
+## Spotify (optional, Premium)
+Reverie can start a Spotify playlist on your Spotify app and follow the session: it starts with the session, pauses/resumes with it, follows the Ambient volume slider (where the device allows), and fades out at the end. Audio plays from Spotify, not from the page, so it works on phones.
+
+1. Go to https://developer.spotify.com/dashboard → *Create app*. Choose **Web API**.
+2. Add Redirect URIs (exact match, with the trailing slash): your deployed URL, e.g. `https://reverie-twinb.vercel.app/`, and for local dev `http://127.0.0.1:3000/` (Spotify doesn't accept `localhost`; open the app via 127.0.0.1).
+3. In *User Management*, add your own Spotify account (apps in development mode only work for listed users).
+4. Copy the **Client ID** and set `NEXT_PUBLIC_SPOTIFY_CLIENT_ID` (`.env.local` locally, Project → Settings → Environment Variables on Vercel, then redeploy).
+5. In Reverie: Sound → **Spotify** → *Connect Spotify* → pick a playlist or paste a link. Keep the Spotify app open on your phone.
+
+Limits: Spotify doesn't allow remote volume control on some devices (e.g. iPhones), so the Ambient slider may not change Spotify's volume there; and the visuals can't react to the music (Spotify gives no audio access).
+
 ## Visual safety
 No flashing or strobing: every oscillation is far below 1 Hz, brightness is tone-mapped and capped, changes are smoothed, and sessions fade in. Reduced motion (auto-enabled from the OS preference) slows everything to a crawl. Every effect is optional.
 

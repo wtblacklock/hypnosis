@@ -17,8 +17,8 @@ const Icon = {
   gear: <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M4 8h10M18 8h2M4 16h2M10 16h10" /><circle cx="16" cy="8" r="2" /><circle cx="8" cy="16" r="2" /></svg>,
 };
 
-export default function Player({ view, s, set, onToggle, onJump, onEnd }: {
-  view: EngineView; s: Settings; set: (p: Partial<Settings>) => void;
+export default function Player({ view, s, set, onToggle, onJump, onEnd, spotifyMsg }: {
+  spotifyMsg?: string; view: EngineView; s: Settings; set: (p: Partial<Settings>) => void;
   onToggle: () => void; onJump: (d: number) => void; onEnd: () => void;
 }) {
   const [show, setShow] = useState(true);
@@ -52,6 +52,10 @@ export default function Player({ view, s, set, onToggle, onJump, onEnd }: {
           style={{ textShadow: "0 0 24px rgba(5,6,20,.95), 0 0 6px rgba(5,6,20,.9)" }}>
           {view.caption}
         </p>
+      )}
+
+      {spotifyMsg && (
+        <p className="pointer-events-none absolute inset-x-0 top-16 mx-auto max-w-sm px-6 text-center text-xs text-amber-200/80">{spotifyMsg}</p>
       )}
 
       {/* top bar */}

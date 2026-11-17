@@ -1,5 +1,5 @@
 export type VisualStyle = "fractal" | "sheep" | "mandala" | "tunnel" | "spiral" | "aurora";
-export type AmbientType = "pad" | "ocean" | "rain" | "padOcean" | "none";
+export type AmbientType = "pad" | "ocean" | "rain" | "padOcean" | "spotify" | "none";
 
 export interface Settings {
   style: VisualStyle;
@@ -18,6 +18,8 @@ export interface Settings {
   particles: boolean;
   breathRings: boolean;
   captions: boolean;
+  spotifyUri: string;
+  spotifyName: string;
   voiceURI: string;
   pace: number; // 0.7 - 1
 }
@@ -36,6 +38,7 @@ export const AMBIENTS: { id: AmbientType; name: string }[] = [
   { id: "ocean", name: "Ocean" },
   { id: "rain", name: "Soft rain" },
   { id: "padOcean", name: "Pad + ocean" },
+  { id: "spotify", name: "Spotify" },
   { id: "none", name: "Silence" },
 ];
 
@@ -56,6 +59,8 @@ export const DEFAULTS: Settings = {
   particles: true,
   breathRings: true,
   captions: true,
+  spotifyUri: "",
+  spotifyName: "",
   voiceURI: "",
   pace: 0.82,
 };
