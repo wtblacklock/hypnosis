@@ -1,9 +1,9 @@
-import { VERT, FRACTAL, MANDALA, AURORA } from "./shaders";
+import { VERT, FRACTAL, MANDALA, AURORA, SHEEP, TUNNEL } from "./shaders";
 import type { VisualState } from "./sessionEngine";
 import type { Settings, VisualStyle } from "./settings";
 
-const FRAGS: Record<VisualStyle, string> = { fractal: FRACTAL, mandala: MANDALA, aurora: AURORA };
-const UNIFORMS = ["u_res", "u_time", "u_breath", "u_depth", "u_intensity", "u_motion", "u_fade", "u_c0", "u_c1", "u_c2"] as const;
+const FRAGS: Record<VisualStyle, string> = { fractal: FRACTAL, sheep: SHEEP, mandala: MANDALA, tunnel: TUNNEL, aurora: AURORA };
+const UNIFORMS = ["u_res", "u_time", "u_breath", "u_depth", "u_intensity", "u_motion", "u_fade", "u_zp", "u_c0", "u_c1", "u_c2"] as const;
 
 interface Prog {
   p: WebGLProgram;
@@ -20,10 +20,13 @@ export class VisualEngine {
   private last = 0;
   private t = 0;
   private breathPhase = 0;
+  private zp = 0;
+  private cycle = 0;
+  private basePalette: number[][] = [[0.4, 0.35, 0.8], [0.2, 0.7, 0.7], [0.9, 0.7, 0.4]];
   private depth = 0;
   private styleFade = 1;
   private shownStyle: VisualStyle;
-  private scale = 0.5;
+  private scale = 0.7;
   private slowFrames = 0;
   private particles: Particle[] = [];
   private w = 0;
@@ -88,7 +91,16 @@ export class VisualEngine {
   }
 
   setPalette(p: number[][]) {
-    this.paletteTarget = p.map((c) => [...c]);
+    this.basePalette = p.map((c) => [...c]);
+  }
+
+  private rotateHue(c: number[], a: number) {
+    const cs = Math.cos(a), sn = Math.sin(a), k = 1 / Math.sqrt(3);
+    const [x, y, z] = c;
+    const dot = (x + y + z) * k * (1 - cs);
+    const cx = k * (y - z), cy = k * (z - x), cz = k * (x - y);
+    const cl = (v: number) => Math.max(0, Math.min(1, v));
+    return [cl(x * cs + cx * sn + k * dot), cl(y * cs + cy * sn + k * dot), cl(z * cs + cz * sn + k * dot)];
   }
 
   private newParticle(initial: boolean): Particle {
@@ -137,14 +149,21 @@ export class VisualEngine {
     const st = this.state;
     const reduced = s.reducedMotion;
 
+    // Colour: session palette rotated by the hue slider (+ optional slow auto-cycle)
+    if (s.colorCycle) this.cycle = (this.cycle + dt / 180) % 1;
+    const ang = (s.hue + this.cycle) * Math.PI * 2;
+    this.paletteTarget = this.basePalette.map((c) => this.rotateHue(c, ang));
+
     // Smooth everything: no sudden changes anywhere.
     this.depth += (st.targetDepth - this.depth) * Math.min(1, dt * 0.15);
     for (let i = 0; i < 3; i++)
-      for (let k = 0; k < 3; k++) this.palette[i][k] += (this.paletteTarget[i][k] - this.palette[i][k]) * Math.min(1, dt * 0.8);
+      for (let k = 0; k < 3; k++) this.palette[i][k] += (this.paletteTarget[i][k] - this.palette[i][k]) * Math.min(1, dt * 2.5);
 
     const idle = st.playing ? 1 : 0.55;
     const speed = (0.5 + 0.55 * s.intensity) * (1 - 0.4 * this.depth) * (reduced ? 0.25 : 1) * idle;
     this.t += dt * speed;
+    // Tunnel zoom phase: slows as you go deeper, never jumps when the slider moves
+    this.zp += dt * 0.03 * s.zoom * (1 - 0.35 * this.depth) * (reduced ? 0.2 : 1) * idle;
     this.breathPhase += dt / Math.max(4, st.breathPeriod);
     const breath = 0.5 - 0.5 * Math.cos(this.breathPhase * Math.PI * 2);
     const motion = reduced ? 0.25 : 1;
@@ -215,6 +234,7 @@ export class VisualEngine {
     gl.uniform1f(u.u_intensity, s.intensity);
     gl.uniform1f(u.u_motion, motion);
     gl.uniform1f(u.u_fade, fade);
+    gl.uniform1f(u.u_zp, this.zp);
     gl.uniform3fv(u.u_c0, this.palette[0]);
     gl.uniform3fv(u.u_c1, this.palette[1]);
     gl.uniform3fv(u.u_c2, this.palette[2]);

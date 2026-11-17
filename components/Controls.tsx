@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { AMBIENTS, STYLES, Settings } from "@/lib/settings";
 import { getVoices, speechSupported } from "@/lib/narrator";
 
-export function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, hint }: {
+export function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, hint, rainbow }: {
+  rainbow?: boolean;
   label: string; value: number; min?: number; max?: number; step?: number; onChange: (v: number) => void; hint?: string;
 }) {
   const pct = ((value - min) / (max - min)) * 100;
@@ -12,7 +13,7 @@ export function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, 
       <div className="mb-1 flex justify-between text-[11px] uppercase tracking-[0.18em] text-[color:var(--muted)]">
         <span>{label}</span><span>{hint ?? `${Math.round(pct)}%`}</span>
       </div>
-      <input type="range" min={min} max={max} step={step} value={value} style={{ ["--v" as string]: `${pct}%` }}
+      <input type="range" className={rainbow ? "rainbow" : ""} min={min} max={max} step={step} value={value} style={{ ["--v" as string]: `${pct}%` }}
         onChange={(e) => onChange(parseFloat(e.target.value))} aria-label={label} />
     </label>
   );
@@ -51,7 +52,7 @@ export default function Controls({ s, set, showStyle = true }: { s: Settings; se
     <div className="space-y-7">
       {showStyle && (
         <Section title="Visual style">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {STYLES.map((v) => (
               <button key={v.id} onClick={() => set({ style: v.id })} aria-pressed={s.style === v.id}
                 className={"rounded-xl border px-2 py-3 text-center text-[13px] transition " +
@@ -60,6 +61,9 @@ export default function Controls({ s, set, showStyle = true }: { s: Settings; se
               </button>
             ))}
           </div>
+          <Slider label="Colour" value={s.hue} min={0} max={1} rainbow hint={`${Math.round(s.hue * 360)}°`} onChange={(v) => set({ hue: v })} />
+          <Toggle label="Slowly cycle colours" on={s.colorCycle} onChange={(v) => set({ colorCycle: v })} />
+          <Slider label="Tunnel zoom speed" value={s.zoom} min={0} max={2} hint={s.zoom === 0 ? "off" : `${s.zoom.toFixed(1)}×`} onChange={(v) => set({ zoom: v })} />
           <Slider label="Visual intensity" value={s.intensity} min={0.2} max={1.5} hint={`${Math.round(s.intensity * 100)}%`} onChange={(v) => set({ intensity: v })} />
         </Section>
       )}

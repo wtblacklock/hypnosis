@@ -9,6 +9,7 @@ uniform float u_depth;
 uniform float u_intensity;
 uniform float u_motion;
 uniform float u_fade;
+uniform float u_zp;
 uniform vec3 u_c0; uniform vec3 u_c1; uniform vec3 u_c2;
 
 mat2 rot(float a){ float s=sin(a), c=cos(a); return mat2(c,-s,s,c); }
@@ -32,13 +33,13 @@ float fbm(vec2 p){
   return v;
 }
 
-// final shared grade: soft tonemap, vignette, depth darkening. Never exceeds a gentle ceiling.
+// Shared grade: hue-preserving highlight compression, saturation, vignette. Never exceeds a gentle ceiling.
 vec3 finish(vec3 col, vec2 uv){
   vec3 bg = mix(vec3(0.012,0.018,0.05), vec3(0.02,0.03,0.09), smoothstep(1.2,0.,length(uv)));
   col = bg + col * (0.25 + 0.85*u_intensity);
   float mx = max(max(col.r, col.g), col.b);
-  col *= (1. - exp(-mx * 1.15)) / max(mx, 1e-3); // hue-preserving soft highlight compression
-  col = pow(col, vec3(1.45)) * 1.45; // deepen darks, keep luminous peaks
+  col *= (1. - exp(-mx * 1.15)) / max(mx, 1e-3);
+  col = pow(col, vec3(1.45)) * 1.45;
   col = min(col, vec3(0.9));
   float lum = dot(col, vec3(0.299,0.587,0.114));
   col = max(mix(vec3(lum), col, 1.3), 0.);
@@ -47,65 +48,87 @@ vec3 finish(vec3 col, vec2 uv){
   col *= 1.0 - 0.10*u_depth;
   return col * u_fade;
 }
-
-void main(){
-  vec2 uv = (gl_FragCoord.xy - 0.5*u_res) / min(u_res.x, u_res.y);
-  float t = u_time;
-  float br = u_breath;
-  vec3 col = vec3(0.);
 `;
 
-const FOOT = `
+const MAIN_PLAIN = `
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*u_res) / min(u_res.x, u_res.y);
+  gl_FragColor = vec4(finish(scene(uv, 1.0), uv), 1.);
+}
+`;
+
+// Endless tunnel zoom: two copies of the scene a half-octave apart, cross-faded so the descent never ends.
+const MAIN_ZOOM = `
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*u_res) / min(u_res.x, u_res.y);
+  float K = 5.0;
+  float ph = fract(u_zp), ph2 = fract(u_zp + 0.5);
+  float w = pow(sin(3.14159265*ph), 2.0);
+  float s1 = pow(K, ph), s2 = pow(K, ph2);
+  vec3 col = scene(uv / s1, s1) * w + scene(uv / s2, s2) * (1.0 - w);
   gl_FragColor = vec4(finish(col, uv), 1.);
 }
 `;
 
-// 1 — Julia fractal: deep slow zoom, swirl, layered orbit-trap glow
+// 1 — Julia fractal with distance-estimated hairline filaments (sharp, luminous), endless tunnel zoom
 export const FRACTAL = HEAD + `
-  float r0 = length(uv);
-  vec2 p = rot(t*0.035 + 0.35*sin(r0*2.2 - t*0.05)*u_motion) * uv;
-  float zoom = 1.55 * exp(0.28*sin(t*0.022)) - 0.12*br*u_motion;
-  vec2 z = p * zoom;
+vec3 scene(vec2 uv, float s){
+  float t = u_time, br = u_breath;
+  vec3 col = vec3(0.);
+  vec2 p = rot(t*0.03 + 0.3*sin(length(uv)*2.0 - t*0.05)*u_motion) * uv * 1.5;
+  vec2 zc = vec2(0.28, 0.42);
+  vec2 z = zc + p;
+  vec2 dz = vec2(1., 0.);
   float a = 2.25 + 0.42*sin(t*0.035) + 0.14*sin(t*0.021);
   vec2 c = 0.7885*vec2(cos(a), sin(a));
-  float trap = 1e3, trap2 = 1e3, trap3 = 1e3, n = 0.;
-  for(int i=0;i<64;i++){
+  float trap = 1e3, trap2 = 1e3, n = 0.;
+  bool esc = false;
+  for(int i=0;i<84;i++){
+    dz = 2.*vec2(z.x*dz.x - z.y*dz.y, z.x*dz.y + z.y*dz.x);
     z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
     trap  = min(trap,  length(z - vec2(0.15*sin(t*0.05), 0.1)));
     trap2 = min(trap2, abs(dot(z, vec2(0.7071, 0.7071)) - 0.3*cos(t*0.04)));
-    trap3 = min(trap3, abs(length(z) - 0.8 - 0.25*sin(t*0.06)));
-    if(dot(z,z) > 40.) break;
+    if(dot(z,z) > 400.){ esc = true; break; }
     n += 1.;
   }
-  float esc = n / 64.;
-  col += pal(trap*0.35 + t*0.014) * exp(-trap * 2.2) * 0.85;
-  col += pal(0.5 + trap2*0.3 - t*0.011) * exp(-trap2 * 4.5) * 0.55;
-  col += pal(0.25 + trap3*0.5 + t*0.008) * exp(-trap3 * 6.0) * 0.6;
-  col += pal(esc*1.6 + t*0.016) * (0.08 + 0.6*pow(esc, 2.0)) * 0.55;
-  col += pal(t*0.01) * exp(-r0*2.6) * (0.35 + 0.2*br*u_motion);
-  // halo rings radiating from the centre
-  col += pal(r0*0.8 - t*0.02) * exp(-pow(fract(r0*1.6 - t*0.03) - 0.5, 2.)*30.) * 0.12;
-` + FOOT;
+  float lz = length(z);
+  float de = esc ? 0.5*lz*log(lz)/max(length(dz), 1e-6) : 0.;
+  float pix = 1.5 / (s * min(u_res.x, u_res.y));
+  float d = de / pix;
+  float fil = exp(-d*0.9);
+  float haze = exp(-d*0.05);
+  float fe = n / 84.;
+  col += pal(fe*2.2 + t*0.014) * fil * 1.5;
+  col += pal(0.4 + fe*1.2 - t*0.01) * haze * 0.35;
+  col += pal(trap*0.35 + t*0.014) * exp(-trap * 2.6) * (esc ? 0.22 : 0.65);
+  col += pal(0.5 + trap2*0.3 - t*0.011) * exp(-trap2 * 6.0) * (esc ? 0.12 : 0.4);
+  col += pal(t*0.01) * exp(-length(uv)*2.4) * (0.22 + 0.14*br*u_motion);
+  return col;
+}
+` + MAIN_ZOOM;
 
-// 2 — Kaleidoscopic mandala: twelve-fold folds, layered rings expanding and contracting
+// 2 — Kaleidoscopic mandala: twelve-fold folds, rings breathing in and out, tunnel zoom
 export const MANDALA = HEAD + `
+vec3 scene(vec2 uv, float s){
+  float t = u_time, br = u_breath;
+  vec3 col = vec3(0.);
   float r = length(uv);
   float ang = atan(uv.y, uv.x) + 0.6*sin(r*2.0 - t*0.04)*u_motion;
   float N = 12.;
   float seg = 6.28318/N;
   float a = abs(mod(ang + t*0.03, seg) - seg*0.5);
   vec2 p = r * vec2(cos(a), sin(a));
-  p *= 1.9 * exp(0.18*sin(t*0.025)) + 0.2*br*u_motion;
+  p *= 1.9 + 0.2*br*u_motion;
   vec2 q = p;
   float acc = 0.;
   for(int i=0;i<7;i++){
     q = abs(q) - vec2(0.40 + 0.06*sin(t*0.07 + float(i)), 0.17);
     q = rot(0.55 + 0.14*sin(t*0.04) + float(i)*0.2) * q;
     float d = abs(q.x*q.y);
-    acc += exp(-d*16.0) * (0.75 / (1. + float(i)*0.45));
-    col += pal(float(i)*0.15 + r*0.5 - t*0.018) * exp(-abs(q.y)*22.0) * 0.10;
+    acc += exp(-d*30.0) * (0.9 / (1. + float(i)*0.45));
+    col += pal(float(i)*0.15 + r*0.5 - t*0.018) * exp(-abs(q.y)*26.0) * 0.16;
   }
-  col += pal(r*0.4 + t*0.014) * acc * 0.42;
+  col += pal(r*0.4 + t*0.014) * acc * 0.55;
   float rings = 0.;
   for(int k=0;k<6;k++){
     float ph = fract(t*0.02 + float(k)/6.);
@@ -114,10 +137,15 @@ export const MANDALA = HEAD + `
   }
   col += pal(0.7 - r*0.6 + t*0.012) * rings * 0.26;
   col += pal(t*0.012 + 0.3) * exp(-r*3.4) * (0.35 + 0.15*br*u_motion);
-` + FOOT;
+  return col;
+}
+` + MAIN_PLAIN;
 
 // 3 — Aurora: layered curtains of light over domain-warped gradients
 export const AURORA = HEAD + `
+vec3 scene(vec2 uv, float s){
+  float t = u_time, br = u_breath;
+  vec3 col = vec3(0.);
   vec2 p = uv * (1.0 + 0.12*sin(t*0.02));
   float flow = t*0.05;
   vec2 w = vec2(fbm(p*1.3 + vec2(flow, -flow*0.7)), fbm(p*1.3 + vec2(-flow*0.8, flow + 4.2)));
@@ -135,4 +163,56 @@ export const AURORA = HEAD + `
   vec2 off = vec2(hash(cell+1.7), hash(cell+9.2)) - 0.5;
   float st = step(0.93, hash(cell)) * smoothstep(0.22, 0.0, length(fract(gp) - 0.5 - off*0.5)) * (0.5+0.5*sin(t*0.3 + hash(cell+3.)*6.28));
   col += vec3(0.5,0.6,0.9) * st * 0.16;
-` + FOOT;
+  return col;
+}
+` + MAIN_PLAIN;
+
+// 4 — Electric Sheep: folded-inversion flame fractal, razor-sharp glowing filaments, tunnel zoom
+export const SHEEP = HEAD + `
+vec3 scene(vec2 uv, float s){
+  float t = u_time, br = u_breath;
+  vec3 col = vec3(0.);
+  vec2 p = rot(t*0.02) * uv * 1.25;
+  vec2 K = vec2(0.92 + 0.10*sin(t*0.031), 0.58 + 0.09*cos(t*0.027));
+  float pl = 0., acc = 0., mn = 1e9, mn2 = 1e9;
+  for(int i=0;i<14;i++){
+    p = abs(p) / max(dot(p,p), 1e-2) - K;
+    float l = length(p);
+    acc += abs(l - pl);
+    pl = l;
+    mn  = min(mn,  abs(p.x*p.y));
+    mn2 = min(mn2, abs(p.x) + abs(p.y) - 0.6);
+  }
+  col += pal(acc*0.011 + t*0.012) * pow(clamp(acc*0.012, 0., 1.), 2.5) * 0.35;
+  col += pal(0.33 + mn*0.4 - t*0.01) * exp(-mn*60.0*s) * 1.1;
+  col += pal(0.66 + t*0.01) * exp(-abs(mn2)*40.0*s) * 0.45;
+  col += pal(t*0.01) * exp(-length(uv)*3.0) * (0.2 + 0.1*br*u_motion);
+  return col;
+}
+` + MAIN_ZOOM;
+
+// 5 — Tunnel: log-polar infinite descent through self-similar kaleidoscopic corridors
+export const TUNNEL = HEAD + `
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*u_res) / min(u_res.x, u_res.y);
+  float t = u_time, br = u_breath;
+  float r = length(uv) + 1e-4;
+  float ang = atan(uv.y, uv.x);
+  float N = 8.;
+  vec2 q = vec2(log(r)*1.25 - u_zp*3.0, ang*N/6.28318 + t*0.02 + 0.3*sin(log(r)*2.0 - u_zp*6.0)*u_motion);
+  vec2 g = fract(q) - 0.5;
+  float acc = 0., mn = 1e9;
+  vec2 p = g * 1.6;
+  for(int i=0;i<7;i++){
+    p = abs(p) - vec2(0.55 + 0.08*sin(t*0.05 + float(i)), 0.28);
+    p = rot(0.6 + 0.2*sin(t*0.03) + float(i)*0.35) * p;
+    mn = min(mn, abs(p.x*p.y));
+    acc += exp(-abs(p.y)*18.0) / (1. + float(i)*0.5);
+  }
+  vec3 col = pal(q.x*0.07 + t*0.012) * (acc*0.22 + exp(-mn*22.0)*0.6);
+  col += pal(0.5 + q.x*0.03 - t*0.01) * exp(-mn*90.0) * 0.6;
+  col *= mix(0.25, 1.0, smoothstep(0.0, 0.5, r));
+  col += pal(t*0.012) * exp(-r*5.0) * (0.55 + 0.25*br*u_motion);
+  gl_FragColor = vec4(finish(col, uv), 1.);
+}
+`;

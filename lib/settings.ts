@@ -1,8 +1,11 @@
-export type VisualStyle = "fractal" | "mandala" | "aurora";
+export type VisualStyle = "fractal" | "sheep" | "mandala" | "tunnel" | "aurora";
 export type AmbientType = "pad" | "ocean" | "rain" | "padOcean" | "none";
 
 export interface Settings {
   style: VisualStyle;
+  hue: number; // 0-1 colour rotation
+  colorCycle: boolean;
+  zoom: number; // tunnel zoom speed 0-2
   intensity: number; // 0.2 - 1.5
   narrationVolume: number; // 0 - 1
   ambientVolume: number; // 0 - 1
@@ -19,7 +22,9 @@ export interface Settings {
 
 export const STYLES: { id: VisualStyle; name: string; blurb: string }[] = [
   { id: "fractal", name: "Fractal Bloom", blurb: "A slowly turning luminous fractal" },
+  { id: "sheep", name: "Electric Sheep", blurb: "Razor-sharp flame filaments, endless descent" },
   { id: "mandala", name: "Mandala", blurb: "Pulsing geometry and breathing rings" },
+  { id: "tunnel", name: "Tunnel", blurb: "Infinite kaleidoscopic corridor" },
   { id: "aurora", name: "Aurora", blurb: "Flowing light waves and gradients" },
 ];
 
@@ -33,6 +38,9 @@ export const AMBIENTS: { id: AmbientType; name: string }[] = [
 
 export const DEFAULTS: Settings = {
   style: "fractal",
+  hue: 0,
+  colorCycle: false,
+  zoom: 1,
   intensity: 1.0,
   narrationVolume: 0.9,
   ambientVolume: 0.5,
@@ -47,7 +55,7 @@ export const DEFAULTS: Settings = {
   pace: 0.82,
 };
 
-const KEY = "reverie.settings.v2";
+const KEY = "reverie.settings.v3";
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULTS };
