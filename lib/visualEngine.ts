@@ -1,9 +1,9 @@
-import { VERT, FRACTAL, MANDALA, AURORA, SHEEP, TUNNEL } from "./shaders";
+import { VERT, FRACTAL, MANDALA, AURORA, SHEEP, TUNNEL, SPIRAL } from "./shaders";
 import type { VisualState } from "./sessionEngine";
 import type { Settings, VisualStyle } from "./settings";
 
-const FRAGS: Record<VisualStyle, string> = { fractal: FRACTAL, sheep: SHEEP, mandala: MANDALA, tunnel: TUNNEL, aurora: AURORA };
-const UNIFORMS = ["u_res", "u_time", "u_breath", "u_depth", "u_intensity", "u_motion", "u_fade", "u_zp", "u_c0", "u_c1", "u_c2"] as const;
+const FRAGS: Record<VisualStyle, string> = { fractal: FRACTAL, sheep: SHEEP, mandala: MANDALA, tunnel: TUNNEL, spiral: SPIRAL, aurora: AURORA };
+const UNIFORMS = ["u_res", "u_time", "u_breath", "u_depth", "u_intensity", "u_motion", "u_fade", "u_zp", "u_sp", "u_c0", "u_c1", "u_c2"] as const;
 
 interface Prog {
   p: WebGLProgram;
@@ -21,6 +21,8 @@ export class VisualEngine {
   private t = 0;
   private breathPhase = 0;
   private zp = 0;
+  private sp = 0;
+  private dirSm = 1;
   private cycle = 0;
   private basePalette: number[][] = [[0.4, 0.35, 0.8], [0.2, 0.7, 0.7], [0.9, 0.7, 0.4]];
   private depth = 0;
@@ -162,6 +164,9 @@ export class VisualEngine {
     const idle = st.playing ? 1 : 0.55;
     const speed = (0.5 + 0.55 * s.intensity) * (1 - 0.4 * this.depth) * (reduced ? 0.25 : 1) * idle;
     this.t += dt * speed;
+    // Spiral flow: direction eases through zero when reversed, so it slows, then turns smoothly
+    this.dirSm += (s.spiralDir - this.dirSm) * Math.min(1, dt * 0.7);
+    this.sp = (((this.sp + dt * 0.04 * s.zoom * this.dirSm * (reduced ? 0.2 : 1) * idle * (1 - 0.3 * this.depth)) % 1) + 1) % 1;
     // Tunnel zoom phase: slows as you go deeper, never jumps when the slider moves
     this.zp += dt * 0.03 * s.zoom * (1 - 0.35 * this.depth) * (reduced ? 0.2 : 1) * idle;
     this.breathPhase += dt / Math.max(4, st.breathPeriod);
@@ -235,6 +240,7 @@ export class VisualEngine {
     gl.uniform1f(u.u_motion, motion);
     gl.uniform1f(u.u_fade, fade);
     gl.uniform1f(u.u_zp, this.zp);
+    gl.uniform1f(u.u_sp, this.sp);
     gl.uniform3fv(u.u_c0, this.palette[0]);
     gl.uniform3fv(u.u_c1, this.palette[1]);
     gl.uniform3fv(u.u_c2, this.palette[2]);

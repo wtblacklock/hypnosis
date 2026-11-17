@@ -61,9 +61,20 @@ export default function Controls({ s, set, showStyle = true }: { s: Settings; se
               </button>
             ))}
           </div>
+          {s.style === "spiral" && (
+            <div className="grid grid-cols-2 gap-2">
+              {([[1, "Flow inward"], [-1, "Flow outward"]] as const).map(([d, label]) => (
+                <button key={d} onClick={() => set({ spiralDir: d })} aria-pressed={s.spiralDir === d}
+                  className={"rounded-xl border px-2 py-2.5 text-[13px] transition " +
+                    (s.spiralDir === d ? "border-teal-300/60 bg-teal-300/15 text-white" : "border-white/10 text-white/60 hover:border-white/30")}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <Slider label="Colour" value={s.hue} min={0} max={1} rainbow hint={`${Math.round(s.hue * 360)}°`} onChange={(v) => set({ hue: v })} />
           <Toggle label="Slowly cycle colours" on={s.colorCycle} onChange={(v) => set({ colorCycle: v })} />
-          <Slider label="Tunnel zoom speed" value={s.zoom} min={0} max={2} hint={s.zoom === 0 ? "off" : `${s.zoom.toFixed(1)}×`} onChange={(v) => set({ zoom: v })} />
+          <Slider label="Zoom / spiral speed" value={s.zoom} min={0} max={2} hint={s.zoom === 0 ? "off" : `${s.zoom.toFixed(1)}×`} onChange={(v) => set({ zoom: v })} />
           <Slider label="Visual intensity" value={s.intensity} min={0.2} max={1.5} hint={`${Math.round(s.intensity * 100)}%`} onChange={(v) => set({ intensity: v })} />
         </Section>
       )}

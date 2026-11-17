@@ -10,6 +10,7 @@ uniform float u_intensity;
 uniform float u_motion;
 uniform float u_fade;
 uniform float u_zp;
+uniform float u_sp;
 uniform vec3 u_c0; uniform vec3 u_c1; uniform vec3 u_c2;
 
 mat2 rot(float a){ float s=sin(a), c=cos(a); return mat2(c,-s,s,c); }
@@ -107,7 +108,7 @@ vec3 scene(vec2 uv, float s){
 }
 ` + MAIN_ZOOM;
 
-// 2 — Kaleidoscopic mandala: twelve-fold folds, rings breathing in and out, tunnel zoom
+// 2 — Kaleidoscopic mandala: twelve-fold folds, rings breathing in and out, endless tunnel zoom
 export const MANDALA = HEAD + `
 vec3 scene(vec2 uv, float s){
   float t = u_time, br = u_breath;
@@ -125,21 +126,21 @@ vec3 scene(vec2 uv, float s){
     q = abs(q) - vec2(0.40 + 0.06*sin(t*0.07 + float(i)), 0.17);
     q = rot(0.55 + 0.14*sin(t*0.04) + float(i)*0.2) * q;
     float d = abs(q.x*q.y);
-    acc += exp(-d*30.0) * (0.9 / (1. + float(i)*0.45));
-    col += pal(float(i)*0.15 + r*0.5 - t*0.018) * exp(-abs(q.y)*26.0) * 0.16;
+    acc += exp(-d*48.0*s) * (0.9 / (1. + float(i)*0.45));
+    col += pal(float(i)*0.15 + r*0.5 - t*0.018) * exp(-abs(q.y)*40.0*s) * 0.16;
   }
   col += pal(r*0.4 + t*0.014) * acc * 0.55;
   float rings = 0.;
   for(int k=0;k<6;k++){
     float ph = fract(t*0.02 + float(k)/6.);
     float rr = ph * 1.25 + 0.06*br*u_motion;
-    rings += exp(-pow((r - rr)*8., 2.)) * sin(3.14159*ph);
+    rings += exp(-pow((r - rr)*8.*s, 2.)) * sin(3.14159*ph);
   }
   col += pal(0.7 - r*0.6 + t*0.012) * rings * 0.26;
-  col += pal(t*0.012 + 0.3) * exp(-r*3.4) * (0.35 + 0.15*br*u_motion);
+  col += pal(t*0.012 + 0.3) * exp(-r*s*3.4) * (0.35 + 0.15*br*u_motion);
   return col;
 }
-` + MAIN_PLAIN;
+` + MAIN_ZOOM;
 
 // 3 — Aurora: layered curtains of light over domain-warped gradients
 export const AURORA = HEAD + `
@@ -213,6 +214,31 @@ void main(){
   col += pal(0.5 + q.x*0.03 - t*0.01) * exp(-mn*90.0) * 0.6;
   col *= mix(0.25, 1.0, smoothstep(0.0, 0.5, r));
   col += pal(t*0.012) * exp(-r*5.0) * (0.55 + 0.25*br*u_motion);
+  gl_FragColor = vec4(finish(col, uv), 1.);
+}
+`;
+
+// 6 — Hypnosis spiral: logarithmic spiral arms flowing slowly inward or outward, colours drifting through the palette
+export const SPIRAL = HEAD + `
+void main(){
+  vec2 uv = (gl_FragCoord.xy - 0.5*u_res) / min(u_res.x, u_res.y);
+  float t = u_time, br = u_breath;
+  float r = length(uv) + 1e-4;
+  float ang = atan(uv.y, uv.x);
+  float lr = log(r);
+  float b = 1.15 + 0.35*sin(t*0.018) + 0.05*br*u_motion;      // tightness slowly breathes
+  float f  = 6.*ang/6.28318 - b*lr*1.6 - 3.*u_sp;
+  float f2 = -4.*ang/6.28318 - b*lr*1.1 - 2.*u_sp;
+  float v  = 0.5 + 0.5*cos(6.28318*f);
+  float v2 = 0.5 + 0.5*cos(6.28318*f2);
+  float arm  = smoothstep(0.28, 0.72, v);
+  float arm2 = smoothstep(0.7, 0.98, v2);
+  float edge = smoothstep(0.0, 0.1, r) * (0.35 + 0.65*smoothstep(1.5, 0.15, r));
+  float hue = lr*0.22 + t*0.02;                               // colour glides outward and through time
+  vec3 col = pal(hue) * arm * 0.75 * edge;
+  col += pal(hue + 0.5) * arm2 * 0.35 * edge;
+  col += pal(hue + 0.25) * pow(v, 6.) * 0.35 * edge;           // luminous arm cores
+  col += pal(t*0.02 + 0.2) * exp(-r*5.0) * (0.7 + 0.3*br*u_motion);
   gl_FragColor = vec4(finish(col, uv), 1.);
 }
 `;
