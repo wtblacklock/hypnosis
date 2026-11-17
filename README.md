@@ -24,6 +24,9 @@ KOKORO_VOICE="bm_george+bm_lewis" ...        # Kokoro voice blends also work
 ```
 Options: `KOKORO_URL`, `KOKORO_VOICE`, `KOKORO_SPEED`, `KOKORO_MODEL`, `KOKORO_FORMAT`, `FORCE=1`. Re-runs only render new or edited lines. When `public/audio/manifest.json` exists the player uses those clips (the pace slider adjusts playback speed); lines without a clip fall back to browser speech. The files are git-ignored.
 
+## Binaural beats
+Ambient options **Delta 2 Hz** (deep sleep), **Theta 6 Hz** (deep relaxation, hypnotic state) and **Alpha 10 Hz** (calm wakefulness), layered under a soft pad. Generated with the Web Audio API (200 Hz carrier left, +beat right) and eased in from 10 Hz over ~3 minutes. Stereo headphones required; evidence is mixed.
+
 ## Spotify (optional, Premium)
 Reverie can start a Spotify playlist on your Spotify app and follow the session: it starts with the session, pauses/resumes with it, follows the Ambient volume slider (where the device allows), and fades out at the end. Audio plays from Spotify, not from the page, so it works on phones.
 

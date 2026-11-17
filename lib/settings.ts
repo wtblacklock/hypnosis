@@ -1,5 +1,5 @@
 export type VisualStyle = "fractal" | "sheep" | "mandala" | "tunnel" | "spiral" | "aurora";
-export type AmbientType = "pad" | "ocean" | "rain" | "padOcean" | "spotify" | "none";
+export type AmbientType = "pad" | "ocean" | "rain" | "padOcean" | "delta" | "theta" | "alpha" | "spotify" | "none";
 
 export interface Settings {
   style: VisualStyle;
@@ -38,9 +38,19 @@ export const AMBIENTS: { id: AmbientType; name: string }[] = [
   { id: "ocean", name: "Ocean" },
   { id: "rain", name: "Soft rain" },
   { id: "padOcean", name: "Pad + ocean" },
+  { id: "delta", name: "Delta 2 Hz" },
+  { id: "theta", name: "Theta 6 Hz" },
+  { id: "alpha", name: "Alpha 10 Hz" },
   { id: "spotify", name: "Spotify" },
   { id: "none", name: "Silence" },
 ];
+
+/** Binaural beat presets: the difference between the tone in each ear is the beat frequency. */
+export const BINAURAL: Partial<Record<AmbientType, { hz: number; title: string; good: string }>> = {
+  delta: { hz: 2, title: "Delta · 2 Hz", good: "Deep, dreamless sleep and physical restoration. Best for Better Sleep." },
+  theta: { hz: 6, title: "Theta · 6 Hz", good: "Deep relaxation, meditation and the hypnotic, dreamlike state. Good for visualization, habit change and creativity." },
+  alpha: { hz: 10, title: "Alpha · 10 Hz", good: "Calm, relaxed wakefulness. Eases stress and racing thoughts, and suits lighter relaxation and confidence work." },
+};
 
 export const DEFAULTS: Settings = {
   style: "fractal",

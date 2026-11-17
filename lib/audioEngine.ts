@@ -1,4 +1,4 @@
-import type { AmbientType } from "./settings";
+import { AmbientType, BINAURAL } from "./settings";
 
 /** Generative ambient sound built entirely with the Web Audio API (no audio files). */
 export class AmbientEngine {
@@ -7,6 +7,10 @@ export class AmbientEngine {
   private padGain!: GainNode;
   private oceanGain!: GainNode;
   private rainGain!: GainNode;
+  private binGain!: GainNode;
+  private rightOsc: OscillatorNode | null = null;
+  private beatNow = 10;
+  private firstBeat = true;
   private started = false;
   private volume = 0.5;
   private type: AmbientType = "pad";
@@ -62,6 +66,8 @@ export class AmbientEngine {
 
   private build() {
     const ctx = this.ctx!;
+    this.firstBeat = true;
+    this.beatNow = 10;
     this.master = ctx.createGain();
     this.master.gain.value = 0;
     this.master.connect(ctx.destination);
@@ -96,6 +102,27 @@ export class AmbientEngine {
         this.nodes.push({ stop: () => o.stop() });
       });
     });
+
+    // --- Binaural beats: pure carrier in the left ear, carrier + beat in the right (needs stereo headphones)
+    this.binGain = ctx.createGain();
+    this.binGain.gain.value = 0;
+    const CARRIER = 200;
+    const mkEar = (freq: number, pan: number) => {
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.value = 0.16;
+      const pn = ctx.createStereoPanner();
+      pn.pan.value = pan;
+      o.connect(g).connect(pn).connect(this.binGain);
+      o.start();
+      this.nodes.push({ stop: () => o.stop() });
+      return o;
+    };
+    mkEar(CARRIER, -1);
+    this.rightOsc = mkEar(CARRIER + this.beatNow, 1);
+    this.binGain.connect(this.master);
 
     // --- Ocean: filtered noise with ~11s swells
     const nbuf = this.noiseBuffer(ctx);
@@ -140,7 +167,20 @@ export class AmbientEngine {
       g.gain.cancelScheduledValues(now);
       g.gain.setTargetAtTime(v, now, t / 3);
     };
-    set(this.padGain, this.type === "pad" ? 1 : this.type === "padOcean" ? 0.7 : 0);
+    const bin = BINAURAL[this.type];
+    set(this.padGain, this.type === "pad" ? 1 : this.type === "padOcean" ? 0.7 : bin ? 0.55 : 0);
+    set(this.binGain, bin ? 1 : 0);
+    if (bin && this.rightOsc) {
+      // First time: start at 10 Hz (alpha) and glide down to the target over ~3 minutes, the way entrainment tracks are usually built
+      const f = this.rightOsc.frequency;
+      const from = this.firstBeat ? 10 : this.beatNow;
+      const secs = this.firstBeat && bin.hz < 10 ? 180 : 8;
+      f.cancelScheduledValues(now);
+      f.setValueAtTime(200 + from, now);
+      f.linearRampToValueAtTime(200 + bin.hz, now + secs);
+      this.beatNow = bin.hz;
+      this.firstBeat = false;
+    }
     set(this.oceanGain, this.type === "ocean" ? 1.1 : this.type === "padOcean" ? 0.7 : 0);
     set(this.rainGain, this.type === "rain" ? 0.5 : 0);
   }

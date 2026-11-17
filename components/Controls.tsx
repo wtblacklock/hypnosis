@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AMBIENTS, STYLES, Settings } from "@/lib/settings";
+import { AMBIENTS, BINAURAL, STYLES, Settings } from "@/lib/settings";
 import { getVoices, speechSupported } from "@/lib/narrator";
 import SpotifyPanel from "./SpotifyPanel";
 
@@ -97,6 +97,17 @@ export default function Controls({ s, set, showStyle = true }: { s: Settings; se
             </button>
           ))}
         </div>
+        {BINAURAL[s.ambient] && (
+          <div className="rounded-xl border border-teal-300/20 bg-teal-300/5 p-3 text-xs leading-relaxed text-white/60">
+            <div className="mb-1 text-[13px] text-teal-100/90">{BINAURAL[s.ambient]!.title}</div>
+            <p>{BINAURAL[s.ambient]!.good}</p>
+            <p className="mt-2 text-white/40">
+              Needs stereo headphones: each ear hears a slightly different tone and your brain perceives the difference as a slow pulse.
+              It eases in from 10 Hz over the first few minutes. Research is mixed and effects vary between people; treat it as a relaxation aid.
+              If you have epilepsy or a seizure disorder, check with your doctor first.
+            </p>
+          </div>
+        )}
         {s.ambient === "spotify" && <SpotifyPanel s={s} set={set} />}
         {speechSupported() && voices.length > 0 && (
           <label className="block">
