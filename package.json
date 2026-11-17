@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "generate:audio": "tsx scripts/generate-audio.ts"
   },
   "dependencies": {
     "next": "^16.4.6",
@@ -20,6 +21,7 @@
     "@types/react-dom": "^19.3.0",
     "postcss": "^8.5.33",
     "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }

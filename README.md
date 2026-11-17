@@ -14,6 +14,16 @@ npm run dev     # http://localhost:3000
 - **Player**: pause/resume, previous/next line, countdown, captions. Tap or move the pointer to reveal controls; they fade after a few seconds. Space toggles pause.
 - **Settings**: visual style & intensity, narration volume, ambient volume/type (pad, ocean, rain, pad+ocean), voice & pace, reduced motion, fixation, rings, particles, captions. Saved in `localStorage`.
 
+## British male voice (local Kokoro)
+Start your Kokoro server (OpenAI-compatible, e.g. Kokoro-FastAPI on :8880), then:
+
+```bash
+npm run generate:audio                       # renders all 131 lines to public/audio (bm_george @ 0.85x)
+KOKORO_VOICE=bm_lewis KOKORO_SPEED=0.8 npm run generate:audio   # other voice/pace
+KOKORO_VOICE="bm_george+bm_lewis" ...        # Kokoro voice blends also work
+```
+Options: `KOKORO_URL`, `KOKORO_VOICE`, `KOKORO_SPEED`, `KOKORO_MODEL`, `KOKORO_FORMAT`, `FORCE=1`. Re-runs only render new or edited lines. When `public/audio/manifest.json` exists the player uses those clips (the pace slider adjusts playback speed); lines without a clip fall back to browser speech. The files are git-ignored.
+
 ## Visual safety
 No flashing or strobing: every oscillation is far below 1 Hz, brightness is tone-mapped and capped, changes are smoothed, and sessions fade in. Reduced motion (auto-enabled from the OS preference) slows everything to a crawl. Every effect is optional.
 

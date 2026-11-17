@@ -4,6 +4,7 @@ import HypnoCanvas from "./HypnoCanvas";
 import SessionSelect from "./SessionSelect";
 import SetupPanel from "./SetupPanel";
 import Player from "./Player";
+import { loadManifest } from "@/lib/narrator";
 import { AmbientEngine } from "@/lib/audioEngine";
 import { EngineView, newVisualState, SessionEngine } from "@/lib/sessionEngine";
 import { DEFAULTS, loadSettings, saveSettings, Settings } from "@/lib/settings";
@@ -27,6 +28,7 @@ export default function App() {
   if (!audio.current && typeof window !== "undefined") audio.current = new AmbientEngine();
 
   useEffect(() => {
+    loadManifest();
     const s = loadSettings();
     settingsRef.current = s;
     setSettings(s);

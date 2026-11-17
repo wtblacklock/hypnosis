@@ -1,4 +1,4 @@
-import { Narrator } from "./narrator";
+import { Narrator, preload } from "./narrator";
 import { buildScript } from "./scripts";
 import type { Phase, Seg } from "./scripts/types";
 import type { SessionId } from "./sessions";
@@ -174,6 +174,8 @@ export class SessionEngine {
       this.visual.breathPeriod = PHASE_BREATH[seg.phase];
       if (!resumingGap) {
         this.caption = seg.t;
+        const nx = this.script[this.index + 1];
+        if (nx) preload(nx.t);
         this.emit();
         const st = this.getSettings();
         const t0 = performance.now();
