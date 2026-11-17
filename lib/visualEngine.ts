@@ -3,7 +3,7 @@ import type { VisualState } from "./sessionEngine";
 import type { Settings, VisualStyle } from "./settings";
 
 const FRAGS: Record<VisualStyle, string> = { fractal: FRACTAL, sheep: SHEEP, mandala: MANDALA, tunnel: TUNNEL, spiral: SPIRAL, aurora: AURORA };
-const UNIFORMS = ["u_res", "u_time", "u_breath", "u_depth", "u_intensity", "u_motion", "u_fade", "u_zp", "u_sp", "u_c0", "u_c1", "u_c2"] as const;
+const UNIFORMS = ["u_res", "u_time", "u_breath", "u_depth", "u_intensity", "u_motion", "u_fade", "u_zp", "u_sp", "u_rot", "u_zc", "u_c0", "u_c1", "u_c2"] as const;
 
 interface Prog {
   p: WebGLProgram;
@@ -22,13 +22,16 @@ export class VisualEngine {
   private breathPhase = 0;
   private zp = 0;
   private sp = 0;
-  private dirSm = 1;
+  private flowSm = 1;
+  private spinSm = 1;
+  private rotA = 0;
+  private zc = [0.3, 0.5];
   private cycle = 0;
   private basePalette: number[][] = [[0.4, 0.35, 0.8], [0.2, 0.7, 0.7], [0.9, 0.7, 0.4]];
   private depth = 0;
   private styleFade = 1;
   private shownStyle: VisualStyle;
-  private scale = 0.7;
+  private scale = 1;
   private slowFrames = 0;
   private particles: Particle[] = [];
   private w = 0;
@@ -96,6 +99,18 @@ export class VisualEngine {
     this.basePalette = p.map((c) => [...c]);
   }
 
+  /** Repelling fixed point of z^2+c: always on the Julia set, so the zoom stays locked on real structure at screen centre. */
+  private updateZoomCentre(T: number) {
+    const a = 2.25 + 0.22 * Math.sin(T * 0.035) + 0.08 * Math.sin(T * 0.021);
+    const cx = 0.7885 * Math.cos(a), cy = 0.7885 * Math.sin(a);
+    const x = 1 - 4 * cx, y = -4 * cy, m = Math.hypot(x, y);
+    const sx = Math.sqrt((m + x) / 2), sy = Math.sign(y || 1) * Math.sqrt((m - x) / 2);
+    const bx = (1 + sx) / 2, by = sy / 2;
+    // a preimage of beta: still on the Julia set, but sitting inside the structure instead of at a lone tip
+    const wx = -bx - cx, wy = -by - cy, wm = Math.hypot(wx, wy);
+    this.zc = [Math.sqrt((wm + wx) / 2), Math.sign(wy || 1) * Math.sqrt((wm - wx) / 2)];
+  }
+
   private rotateHue(c: number[], a: number) {
     const cs = Math.cos(a), sn = Math.sin(a), k = 1 / Math.sqrt(3);
     const [x, y, z] = c;
@@ -120,6 +135,8 @@ export class VisualEngine {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.fxCanvas.width = Math.round(this.w * this.dpr);
     this.fxCanvas.height = Math.round(this.h * this.dpr);
+    const px = this.w * this.h;
+    this.scale = Math.max(0.4, Math.min(this.dpr, 1.5, Math.sqrt(1.5e6 / px)));
     this.applyScale();
   }
 
@@ -164,11 +181,14 @@ export class VisualEngine {
     const idle = st.playing ? 1 : 0.55;
     const speed = (0.5 + 0.55 * s.intensity) * (1 - 0.4 * this.depth) * (reduced ? 0.25 : 1) * idle;
     this.t += dt * speed;
-    // Spiral flow: direction eases through zero when reversed, so it slows, then turns smoothly
-    this.dirSm += (s.spiralDir - this.dirSm) * Math.min(1, dt * 0.7);
-    this.sp = (((this.sp + dt * 0.04 * s.zoom * this.dirSm * (reduced ? 0.2 : 1) * idle * (1 - 0.3 * this.depth)) % 1) + 1) % 1;
-    // Tunnel zoom phase: slows as you go deeper, never jumps when the slider moves
-    this.zp += dt * 0.03 * s.zoom * (1 - 0.35 * this.depth) * (reduced ? 0.2 : 1) * idle;
+    // Direction changes ease through zero (slow, turn, speed up) so reversing is never abrupt
+    this.flowSm += (s.flow - this.flowSm) * Math.min(1, dt * 0.7);
+    this.spinSm += (s.spin - this.spinSm) * Math.min(1, dt * 0.7);
+    const calm = (reduced ? 0.2 : 1) * idle;
+    this.sp = (((this.sp - dt * 0.04 * s.zoom * this.flowSm * calm * (1 - 0.3 * this.depth)) % 1) + 1) % 1;
+    this.zp += dt * 0.03 * s.zoom * this.flowSm * (1 - 0.35 * this.depth) * calm;
+    this.rotA += dt * 0.03 * speed * this.spinSm;
+    this.updateZoomCentre(this.t + 40);
     this.breathPhase += dt / Math.max(4, st.breathPeriod);
     const breath = 0.5 - 0.5 * Math.cos(this.breathPhase * Math.PI * 2);
     const motion = reduced ? 0.25 : 1;
@@ -241,6 +261,8 @@ export class VisualEngine {
     gl.uniform1f(u.u_fade, fade);
     gl.uniform1f(u.u_zp, this.zp);
     gl.uniform1f(u.u_sp, this.sp);
+    gl.uniform1f(u.u_rot, this.rotA);
+    gl.uniform2f(u.u_zc, this.zc[0], this.zc[1]);
     gl.uniform3fv(u.u_c0, this.palette[0]);
     gl.uniform3fv(u.u_c1, this.palette[1]);
     gl.uniform3fv(u.u_c2, this.palette[2]);

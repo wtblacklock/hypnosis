@@ -5,7 +5,8 @@ export interface Settings {
   style: VisualStyle;
   hue: number; // 0-1 colour rotation
   colorCycle: boolean;
-  spiralDir: 1 | -1; // 1 = flows inward, -1 = outward
+  flow: 1 | -1; // 1 = visuals move outward (zoom in), -1 = inward
+  spin: 1 | -1; // 1 = clockwise, -1 = counter-clockwise
   zoom: number; // tunnel zoom speed 0-2
   intensity: number; // 0.2 - 1.5
   narrationVolume: number; // 0 - 1
@@ -43,7 +44,8 @@ export const DEFAULTS: Settings = {
   hue: 0,
   colorCycle: false,
   zoom: 1,
-  spiralDir: 1,
+  flow: 1,
+  spin: 1,
   intensity: 1.0,
   narrationVolume: 0.9,
   ambientVolume: 0.5,
@@ -58,7 +60,7 @@ export const DEFAULTS: Settings = {
   pace: 0.82,
 };
 
-const KEY = "reverie.settings.v4";
+const KEY = "reverie.settings.v5";
 
 export function loadSettings(): Settings {
   const s = { ...DEFAULTS };

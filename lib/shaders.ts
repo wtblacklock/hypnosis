@@ -11,6 +11,8 @@ uniform float u_motion;
 uniform float u_fade;
 uniform float u_zp;
 uniform float u_sp;
+uniform float u_rot;
+uniform vec2 u_zc;
 uniform vec3 u_c0; uniform vec3 u_c1; uniform vec3 u_c2;
 
 mat2 rot(float a){ float s=sin(a), c=cos(a); return mat2(c,-s,s,c); }
@@ -71,39 +73,40 @@ void main(){
 }
 `;
 
-// 1 — Julia fractal with distance-estimated hairline filaments (sharp, luminous), endless tunnel zoom
+// 1 — Julia fractal: kaleidoscope-centred, zooming into the repelling fixed point (always on the set), hairline filaments
 export const FRACTAL = HEAD + `
 vec3 scene(vec2 uv, float s){
   float t = u_time, br = u_breath;
   vec3 col = vec3(0.);
-  vec2 p = rot(t*0.03 + 0.3*sin(length(uv)*2.0 - t*0.05)*u_motion) * uv * 1.5;
-  vec2 zc = vec2(0.28, 0.42);
-  vec2 z = zc + p;
+  float r0 = length(uv) + 1e-5;
+  float an = atan(uv.y, uv.x);
+  float N = 6.;
+  float sg = 6.28318/N;
+  float aa = abs(mod(an + u_rot, sg) - sg*0.5);       // mirror-fold: image is always centred, rotates with spin
+  float phi0 = atan(-u_zc.y, -u_zc.x) - sg*0.25;      // aim the wedge from the pivot toward the middle of the set
+  vec2 p = r0 * vec2(cos(aa + phi0), sin(aa + phi0)) * 1.6;
+  vec2 z = u_zc + p;
   vec2 dz = vec2(1., 0.);
-  float a = 2.25 + 0.42*sin(t*0.035) + 0.14*sin(t*0.021);
+  float a = 2.25 + 0.22*sin(t*0.035) + 0.08*sin(t*0.021);
   vec2 c = 0.7885*vec2(cos(a), sin(a));
-  float trap = 1e3, trap2 = 1e3, n = 0.;
+  float trap = 1e3, n = 0.;
   bool esc = false;
-  for(int i=0;i<84;i++){
+  for(int i=0;i<90;i++){
     dz = 2.*vec2(z.x*dz.x - z.y*dz.y, z.x*dz.y + z.y*dz.x);
     z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
-    trap  = min(trap,  length(z - vec2(0.15*sin(t*0.05), 0.1)));
-    trap2 = min(trap2, abs(dot(z, vec2(0.7071, 0.7071)) - 0.3*cos(t*0.04)));
+    trap = min(trap, abs(length(z) - 0.9 - 0.2*sin(t*0.05)));
     if(dot(z,z) > 400.){ esc = true; break; }
     n += 1.;
   }
   float lz = length(z);
+  float nsm = n + 1.0 - log2(log2(max(lz, 1.0001)));   // smooth iteration count: no banding
   float de = esc ? 0.5*lz*log(lz)/max(length(dz), 1e-6) : 0.;
-  float pix = 1.5 / (s * min(u_res.x, u_res.y));
-  float d = de / pix;
-  float fil = exp(-d*0.9);
-  float haze = exp(-d*0.05);
-  float fe = n / 84.;
-  col += pal(fe*2.2 + t*0.014) * fil * 1.5;
-  col += pal(0.4 + fe*1.2 - t*0.01) * haze * 0.35;
-  col += pal(trap*0.35 + t*0.014) * exp(-trap * 2.6) * (esc ? 0.22 : 0.65);
-  col += pal(0.5 + trap2*0.3 - t*0.011) * exp(-trap2 * 6.0) * (esc ? 0.12 : 0.4);
-  col += pal(t*0.01) * exp(-length(uv)*2.4) * (0.22 + 0.14*br*u_motion);
+  float pix = 1.6 / (s * min(u_res.x, u_res.y));
+  float d = de / pix;                                   // distance to the set in screen pixels
+  col += pal(nsm*0.012 + r0*s*0.5 + t*0.014) * exp(-d*1.9) * 1.5;           // crisp filaments
+  col += pal(0.45 + nsm*0.006 + r0*s*0.3 - t*0.01) * exp(-d*0.22) * 0.30;       // soft aura
+  col += pal(0.2 + trap*0.4 + t*0.012) * exp(-trap*3.0) * (esc ? 0.0 : 0.6);   // calm interior glow
+  col += pal(t*0.01) * exp(-r0*s*2.6) * (0.2 + 0.12*br*u_motion);
   return col;
 }
 ` + MAIN_ZOOM;
@@ -117,7 +120,7 @@ vec3 scene(vec2 uv, float s){
   float ang = atan(uv.y, uv.x) + 0.6*sin(r*2.0 - t*0.04)*u_motion;
   float N = 12.;
   float seg = 6.28318/N;
-  float a = abs(mod(ang + t*0.03, seg) - seg*0.5);
+  float a = abs(mod(ang + u_rot, seg) - seg*0.5);
   vec2 p = r * vec2(cos(a), sin(a));
   p *= 1.9 + 0.2*br*u_motion;
   vec2 q = p;
@@ -132,7 +135,7 @@ vec3 scene(vec2 uv, float s){
   col += pal(r*0.4 + t*0.014) * acc * 0.55;
   float rings = 0.;
   for(int k=0;k<6;k++){
-    float ph = fract(t*0.02 + float(k)/6.);
+    float ph = fract(u_zp*0.7 + float(k)/6.);
     float rr = ph * 1.25 + 0.06*br*u_motion;
     rings += exp(-pow((r - rr)*8.*s, 2.)) * sin(3.14159*ph);
   }
@@ -149,8 +152,9 @@ vec3 scene(vec2 uv, float s){
   vec3 col = vec3(0.);
   vec2 p = uv * (1.0 + 0.12*sin(t*0.02));
   float flow = t*0.05;
-  vec2 w = vec2(fbm(p*1.3 + vec2(flow, -flow*0.7)), fbm(p*1.3 + vec2(-flow*0.8, flow + 4.2)));
-  float n = fbm(p*1.1 + w*2.0 + vec2(0., flow*0.5));
+  vec2 adv = vec2(-u_rot*0.5, u_zp*0.4);
+  vec2 w = vec2(fbm(p*1.3 + adv + vec2(flow, -flow*0.7)), fbm(p*1.3 + adv + vec2(-flow*0.8, flow + 4.2)));
+  float n = fbm(p*1.1 + adv + w*2.0 + vec2(0., flow*0.5));
   for(int i=0;i<5;i++){
     float fi = float(i);
     float y = p.y - (fi-2.)*0.22 - 0.18*sin(p.x*2.1 + t*0.07 + fi*1.7) - (n-0.5)*0.6 + 0.04*br*u_motion;
@@ -173,20 +177,20 @@ export const SHEEP = HEAD + `
 vec3 scene(vec2 uv, float s){
   float t = u_time, br = u_breath;
   vec3 col = vec3(0.);
-  vec2 p = rot(t*0.02) * uv * 1.25;
+  vec2 p = rot(-u_rot*0.67) * uv * 1.25;
   vec2 K = vec2(0.92 + 0.10*sin(t*0.031), 0.58 + 0.09*cos(t*0.027));
   float pl = 0., acc = 0., mn = 1e9, mn2 = 1e9;
-  for(int i=0;i<14;i++){
-    p = abs(p) / max(dot(p,p), 1e-2) - K;
+  for(int i=0;i<7;i++){
+    p = abs(p) / max(dot(p,p), 8e-2) - K;
     float l = length(p);
     acc += abs(l - pl);
     pl = l;
     mn  = min(mn,  abs(p.x*p.y));
     mn2 = min(mn2, abs(p.x) + abs(p.y) - 0.6);
   }
-  col += pal(acc*0.011 + t*0.012) * pow(clamp(acc*0.012, 0., 1.), 2.5) * 0.35;
-  col += pal(0.33 + mn*0.4 - t*0.01) * exp(-mn*60.0*s) * 1.1;
-  col += pal(0.66 + t*0.01) * exp(-abs(mn2)*40.0*s) * 0.45;
+  col += pal(acc*0.011 + t*0.012) * pow(clamp(acc*0.016, 0., 1.), 3.0) * 0.12;
+  col += pal(0.33 + mn*0.4 - t*0.01) * exp(-mn*30.0*s) * 1.0;
+  col += pal(0.66 + t*0.01) * exp(-abs(mn2)*34.0*s) * 0.4;
   col += pal(t*0.01) * exp(-length(uv)*3.0) * (0.2 + 0.1*br*u_motion);
   return col;
 }
@@ -200,7 +204,7 @@ void main(){
   float r = length(uv) + 1e-4;
   float ang = atan(uv.y, uv.x);
   float N = 8.;
-  vec2 q = vec2(log(r)*1.25 - u_zp*3.0, ang*N/6.28318 + t*0.02 + 0.3*sin(log(r)*2.0 - u_zp*6.0)*u_motion);
+  vec2 q = vec2(log(r)*1.25 - u_zp*3.0, ang*N/6.28318 + u_rot*0.67 + 0.3*sin(log(r)*2.0 - u_zp*6.0)*u_motion);
   vec2 g = fract(q) - 0.5;
   float acc = 0., mn = 1e9;
   vec2 p = g * 1.6;
@@ -227,8 +231,8 @@ void main(){
   float ang = atan(uv.y, uv.x);
   float lr = log(r);
   float b = 1.15 + 0.35*sin(t*0.018) + 0.05*br*u_motion;      // tightness slowly breathes
-  float f  = 6.*ang/6.28318 - b*lr*1.6 - 3.*u_sp;
-  float f2 = -4.*ang/6.28318 - b*lr*1.1 - 2.*u_sp;
+  float f  = 6.*(ang + u_rot)/6.28318 - b*lr*1.6 - 3.*u_sp;
+  float f2 = -4.*(ang + u_rot)/6.28318 - b*lr*1.1 - 2.*u_sp;
   float v  = 0.5 + 0.5*cos(6.28318*f);
   float v2 = 0.5 + 0.5*cos(6.28318*f2);
   float arm  = smoothstep(0.28, 0.72, v);
