@@ -22,7 +22,7 @@ npm run generate:audio                       # renders all 131 lines to public/a
 KOKORO_VOICE=bm_lewis KOKORO_SPEED=0.8 npm run generate:audio   # other voice/pace
 KOKORO_VOICE="bm_george+bm_lewis" ...        # Kokoro voice blends also work
 ```
-Options: `KOKORO_URL`, `KOKORO_VOICE`, `KOKORO_SPEED`, `KOKORO_MODEL`, `KOKORO_FORMAT`, `FORCE=1`. Re-runs only render new or edited lines. When `public/audio/manifest.json` exists the player uses those clips (the pace slider adjusts playback speed); lines without a clip fall back to browser speech. The files are git-ignored.
+Options: `KOKORO_URL`, `KOKORO_VOICE`, `KOKORO_SPEED`, `KOKORO_MODEL`, `KOKORO_FORMAT`, `FORCE=1`. Re-runs only render new or edited lines. When `public/audio/manifest.json` exists the player uses those clips (the pace slider adjusts playback speed); lines without a clip fall back to browser speech. Commit `public/audio` so a deployed copy (e.g. on your phone) has the voice too.
 
 ## Binaural beats
 Ambient options **Delta 2 Hz** (deep sleep), **Theta 6 Hz** (deep relaxation, hypnotic state) and **Alpha 10 Hz** (calm wakefulness), layered under a soft pad. Generated with the Web Audio API (200 Hz carrier left, +beat right) and eased in from 10 Hz over ~3 minutes. Stereo headphones required; evidence is mixed.
