@@ -66,6 +66,7 @@ export class SessionEngine {
     this.visual.playing = true;
     this.visual.fade = 1;
     this.audio.start();
+    this.narrator.unlock();
     this.beginTicker();
     this.run(++this.gen, false);
     this.emit();

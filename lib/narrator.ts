@@ -86,61 +86,82 @@ export class Narrator {
       };
       this.resolve = finish;
       const est = o.text.length / o.cps;
+      const synth = () => {
+        if (!speechSupported() || o.volume <= 0.001) {
+          this.timer = setTimeout(finish, est * 1000);
+          return;
+        }
+        const u = new SpeechSynthesisUtterance(o.text);
+        const v = pickVoice(o.voiceURI);
+        if (v) {
+          u.voice = v;
+          u.lang = v.lang;
+        }
+        u.rate = o.rate;
+        u.pitch = 0.92;
+        u.volume = Math.min(1, o.volume);
+        const t0 = performance.now();
+        // If the engine bails out instantly (no voices installed), keep reading-pace timing so the session doesn't rush.
+        const settle = () => {
+          const spent = (performance.now() - t0) / 1000;
+          if (spent < est * 0.5) {
+            if (this.timer) clearTimeout(this.timer);
+            this.timer = setTimeout(finish, (est - spent) * 1000);
+          } else finish();
+        };
+        u.onend = settle;
+        u.onerror = (e) => {
+          if (e.error === "interrupted" || e.error === "canceled") finish();
+          else settle();
+        };
+        // Some engines never fire onend; guard generously
+        this.timer = setTimeout(finish, (est * 1.8 + 6) * 1000);
+        try {
+          window.speechSynthesis.speak(u);
+        } catch {
+          finish();
+        }
+      };
       const url = clipUrl(o.text);
-      if (url) {
-        const a = new Audio(url);
-        this.audioEl = a;
-        a.volume = Math.min(1, o.volume);
-        a.playbackRate = Math.max(0.7, Math.min(1.25, o.rate / 0.82));
+      if (url && o.volume > 0.001) {
+        // One persistent <audio> element: phones only unlock playback once, per element, from a tap
+        const a = this.getEl();
         a.onended = finish;
-        a.onerror = () => { this.timer = setTimeout(finish, est * 1000); };
+        a.onerror = () => { a.onerror = null; if (this.timer) clearTimeout(this.timer); synth(); };
+        a.volume = Math.min(1, o.volume);
+        a.src = url;
+        a.playbackRate = Math.max(0.7, Math.min(1.25, o.rate / 0.82));
         this.timer = setTimeout(finish, (est * 2 + 8) * 1000);
-        if (o.volume <= 0.001) { a.muted = true; }
-        a.play().catch(() => { this.timer = setTimeout(finish, est * 1000); });
+        a.play().catch(() => { a.onerror = null; if (this.timer) clearTimeout(this.timer); synth(); });
         return;
       }
-      if (!speechSupported() || o.volume <= 0.001) {
-        this.timer = setTimeout(finish, est * 1000);
-        return;
-      }
-      const u = new SpeechSynthesisUtterance(o.text);
-      const v = pickVoice(o.voiceURI);
-      if (v) {
-        u.voice = v;
-        u.lang = v.lang;
-      }
-      u.rate = o.rate;
-      u.pitch = 0.92;
-      u.volume = Math.min(1, o.volume);
-      const t0 = performance.now();
-      // If the engine bails out instantly (no voices installed), keep reading-pace timing so the session doesn't rush.
-      const settle = () => {
-        const spent = (performance.now() - t0) / 1000;
-        if (spent < est * 0.5) {
-          if (this.timer) clearTimeout(this.timer);
-          this.timer = setTimeout(finish, (est - spent) * 1000);
-        } else finish();
-      };
-      u.onend = settle;
-      u.onerror = (e) => {
-        if (e.error === "interrupted" || e.error === "canceled") finish();
-        else settle();
-      };
-      // Some engines never fire onend; guard generously
-      this.timer = setTimeout(finish, (est * 1.8 + 6) * 1000);
-      try {
-        window.speechSynthesis.speak(u);
-      } catch {
-        finish();
-      }
+      synth();
     });
+  }
+
+  private getEl() {
+    if (!this.audioEl) {
+      this.audioEl = new Audio();
+      this.audioEl.preload = "auto";
+      this.audioEl.setAttribute("playsinline", "");
+    }
+    return this.audioEl;
+  }
+
+  /** Call from a tap: unlocks audio playback on phones so every later clip is allowed. */
+  unlock() {
+    try {
+      const a = this.getEl();
+      a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+      a.play().catch(() => {});
+    } catch {}
   }
 
   cancel() {
     if (this.audioEl) {
       this.audioEl.onended = null;
+      this.audioEl.onerror = null;
       this.audioEl.pause();
-      this.audioEl = null;
     }
     if (speechSupported()) {
       try {
